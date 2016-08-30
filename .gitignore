@@ -1,2 +1,3 @@
 *.egg-info
 *.sublime-workspace
+*.sublime-project
