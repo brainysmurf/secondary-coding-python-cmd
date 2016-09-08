@@ -1,19 +1,19 @@
 from distutils.core import setup
 setup(
-    name = "My first command-line program",
-    version = "0.1",
-    description = "description",
-    author = "yourname",
+    name = "Speaking Hangman!",
+    version = "0.5",
+    description = "Do hangman, the cmdline way",
+    author = "Adam Morris",
     author_email = "",
     keywords = [],
-    packages=['cmd', 'gns'],
+    packages=['hangman'],
     entry_points='''
         [console_scripts]
-        cmd=cmd.cli:cli
+        hangman=hangman.cli:cli
     ''',
     install_requires = ['click'],
 
     long_description = """
-    Your long description here (optional)
+    A way of doing the hangman game through the command line
     """
 )
