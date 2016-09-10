@@ -6,6 +6,7 @@ Then, adjust the setup.py entry_points to
 import click
 from hangman.pics import pics
 import subprocess
+import time
 
 class HangmanObject(object):
     """
@@ -17,6 +18,8 @@ class HangmanObject(object):
             setattr(self, key, kwargs[key])
     def echo_red(self, s, **kwargs):
         click.echo(click.style(s, fg='red'))
+    def echo_green(self, s, **kwargs):
+        click.echo(click.style(s, fg='green'))
     def echo_yellow(self, s):
         click.echo(click.style(s, fg='yellow'))
     def echo_white(self, s):
@@ -38,14 +41,15 @@ class HangmanObject(object):
     def pause(self, **kwargs):
         click.pause(**kwargs)
     def is_solved(self):
-        return (set(self.answer) - set(self.chosen)) == set()
+        return (set(self.answer.lower()) - set(self.chosen.lower())) == set()
 
 @click.group()
 @click.option('-v', '--verbose', default=0, count=True, help="Help to debug your program, add more for more output")
+@click.option('-ns', '--nosound', default=True, is_flag=True, help="Toggle the sound, default is on")
 @click.pass_context
-def cli(hangman, verbose):
+def cli(hangman, verbose, nosound):
     # Creates the object, only happens once every time it is run
-    hangman.obj = HangmanObject(verbose=verbose)
+    hangman.obj = HangmanObject(verbose=verbose, sound=nosound)
 
 @cli.command('pic')
 @click.argument('num_errors', type=int)
@@ -64,7 +68,9 @@ def say(obj, what):
     Works by calling the system's "say" command (Mac-only)
     If sound is turned off, does nothing
     """
-    if not obj.sound: return
+    if not obj.sound:
+        time.sleep(0.2)  # slight delay
+        return
     cmds = ['say']
     cmds.extend(what)
     subprocess.run(cmds)
@@ -150,7 +156,6 @@ def run(hangman):
         prompt={'default':default_name, 'show_default':False}
     )
     hangman.obj.player_name = name
-    hangman.obj.sound = not hangman.obj.player_name == default_name
     hangman.obj.player_name = hangman.obj.player_name.title()
 
     # Say hello to the player
@@ -175,7 +180,7 @@ def run(hangman):
 
     # Set up the counters
     hangman.obj.num_errors = 0
-    hangman.obj.chosen = []
+    hangman.obj.chosen = ''
 
     over = False
     while not over:
@@ -188,7 +193,7 @@ def run(hangman):
         hangman.invoke(
             blanks, 
             answer=hangman.obj.answer, 
-            chosen="".join(hangman.obj.chosen), 
+            chosen=hangman.obj.chosen,
             clue=hangman.obj.clue
         )
         hangman.obj.new_line()
@@ -218,35 +223,51 @@ def run(hangman):
             say, 
             what=[choice]
         )
-        hangman.obj.chosen.append(choice)
+        hangman.obj.chosen += choice
 
         if choice.lower() not in hangman.obj.answer.lower():
+            hangman.obj.echo_red('No')
             hangman.invoke(
                 say, 
-                what=['Wrong!']
+                what=['No!']
             )
-            hangman.obj.echo_red("WRONG")
             hangman.obj.num_errors += 1
+
+            if hangman.obj.num_errors == 5:
+                hangman.invoke(
+                    say, what=["Careful..."]
+                )
 
             # check if we lost
             if hangman.obj.num_errors == 6:
+                hangman.obj.echo_red("HA!")
                 hangman.invoke(
                     say, what=["Ha, ", "you", "lose"]
                 )
-                hangman.obj.clear()
+                hangman.obj.clear_screen()
                 hangman.invoke(
                     pic, 
                     num_errors=hangman.obj.num_errors, color="red"
                 )
                 hangman.obj.new_line()
+                hangman.obj.echo("Correct:")
+                hangman.obj.new_line()
                 hangman.invoke(
                     blanks, 
                     answer=hangman.obj.answer, chosen=hangman.obj.answer
                 )
+                hangman.obj.new_line()
+                hangman.obj.new_line()
+                hangman.obj.echo("Your plays:")
+                hangman.invoke(
+                    blanks, 
+                    answer=hangman.obj.answer, chosen=hangman.obj.chosen
+                )                
                 hangman.obj.pause(info="")
-                hangman.obj.clear()
+                hangman.obj.clear_screen()
                 over = True
         else:
+            hangman.obj.echo_green("Yes!")
             hangman.invoke(
                 say, what=["Yes!"]
             )
