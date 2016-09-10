@@ -9,6 +9,7 @@ import subprocess
 
 class HangmanObject(object):
     """
+    HangmanObject is the 'obj' in this program, and is passed to the functions
     Interface between the command line and the user
     """
     def __init__(self, **kwargs):
@@ -36,6 +37,8 @@ class HangmanObject(object):
         return click.prompt(click.style(s, **style), **prompt)
     def pause(self, **kwargs):
         click.pause(**kwargs)
+    def is_solved(self):
+        return (set(self.answer) - set(self.chosen)) == set()
 
 @click.group()
 @click.option('-v', '--verbose', default=0, count=True, help="Help to debug your program, add more for more output")
@@ -172,7 +175,6 @@ def run(hangman):
 
     # Set up the counters
     hangman.obj.num_errors = 0
-    hangman.obj.remaining = len(list(set([c for c in hangman.obj.answer if c != ' '])))
     hangman.obj.chosen = []
 
     over = False
@@ -191,7 +193,7 @@ def run(hangman):
         )
         hangman.obj.new_line()
 
-        if hangman.obj.remaining == 0:
+        if hangman.obj.is_solved():
             hangman.obj.echo_yellow('!!!!! YOU WON !!!!!')
             hangman.invoke(
                 say, what=["YOU", "WON", "!"]
@@ -248,7 +250,6 @@ def run(hangman):
             hangman.invoke(
                 say, what=["Yes!"]
             )
-            hangman.obj.remaining -= 1
 
 
 
