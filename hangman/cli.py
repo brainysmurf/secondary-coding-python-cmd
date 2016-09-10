@@ -1,6 +1,5 @@
 """
-Make a copy of this file, call it "mycli.py"
-Then, adjust the setup.py entry_points to 
+Hangman game, for instructional purposes
 """
 
 import click
@@ -41,7 +40,12 @@ class HangmanObject(object):
     def pause(self, **kwargs):
         click.pause(**kwargs)
     def is_solved(self):
-        return (set(self.answer.lower()) - set(self.chosen.lower())) == set()
+        """
+        In order to determine if the player has won
+        We use some math, specifically a set operation
+        Spaces do not count for the 'answer', so we have to remove them with the String.replace function
+        """
+        return (set(self.answer.lower().replace(' ', '')) - set(self.chosen.lower())) == set()
 
 @click.group()
 @click.option('-v', '--verbose', default=0, count=True, help="Help to debug your program, add more for more output")
@@ -91,7 +95,13 @@ def blanks(obj, answer, chosen, clue):
 
     # Go through each word in the answer
     # and pick the right color
+    width_count = 0
+    max_width, _ = click.get_terminal_size()
     for word in answer.split(' '):
+        width_count += (len(word) + 1) * 2
+        if width_count > max_width:
+            obj.new_line()
+            width_count = (len(word) + 1) * 2
         for l in range(len(word)):
             letter = word[l].lower()
             if letter in chosen:
@@ -135,6 +145,11 @@ def ask_user(obj):
     while not choice:
         choice = obj.styled_prompt("Pick any letter", style={'fg': "yellow"})
         choice = choice.lower()
+        if choice == 'debug':
+            # special operation to go into the debugger
+            from IPython import embed;embed()
+            choice = None
+            continue
         if not valid_choice(choice):
             obj.styled_echo("Has to be just one character!", fg="red")
             choice = None
@@ -201,7 +216,7 @@ def run(hangman):
         if hangman.obj.is_solved():
             hangman.obj.echo_yellow('!!!!! YOU WON !!!!!')
             hangman.invoke(
-                say, what=["YOU", "WON", "!"]
+                say, what=hangman.obj.answer.split(' ')
             )
             hangman.obj.pause(info="")
             hangman.obj.clear_screen()
