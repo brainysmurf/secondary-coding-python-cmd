@@ -2,77 +2,110 @@
 Hangman game, for instructional purposes
 """
 
-import click
-from hangman.pics import pics
-import subprocess
-import time
+from hangman.pics import pics   # pics: lets us use the pics defined in the other file
+import subprocess               # subprocess: Gives us the 'say' command
+import time                     # time: let's us delay the action briefly
+
+import click                    # click: provides tools that makes input and output much easier for the programmer
+"""
+Click is a framework provided by an open source group
+http://click.pocoo.org/
+We use it to interact with the user and 
+    to ouput stuff to the screen
+The next 10 lines defines more descriptive variables for
+    the click functions that we use
+"""
+output_to_screen  = click.echo
+stylize_string    = click.style
+prompt_user       = click.prompt
+wait_for_any_key  = click.pause
+pass_hangman      = click.pass_context
+form_group        = click.group
+make_command      = click.command
+add_argument      = click.argument
+add_option        = click.option
+add_argument      = click.argument
+
 
 class HangmanObject(object):
     """
     HangmanObject is the 'obj' in this program, and is passed to the functions
-    Interface between the command line and the user
+    Provides functions that:
+       * output to screen
+       * gets input from ask_user
     """
-    def __init__(self, **kwargs):
-        for key in kwargs:
-            setattr(self, key, kwargs[key])
-    def echo_red(self, s, **kwargs):
-        click.echo(click.style(s, fg='red'))
-    def echo_green(self, s, **kwargs):
-        click.echo(click.style(s, fg='green'))
-    def echo_yellow(self, s):
-        click.echo(click.style(s, fg='yellow'))
-    def echo_white(self, s):
-        click.echo(click.style(s, fg='white'))
-    def styled_echo(self, s, **kwargs):
-        click.echo(click.style(s, **kwargs))
-    def stylized_echo(self, s, echo={}, style={}):
-        click.echo(click.style(s, **style), **echo)
-    def new_line(self):
-        click.echo()
+    def __init__(self, verbose, sound):
+        """
+        Called at object creation
+        """
+        self.verbose = verbose   # note: verbose is not currently used for anything
+        self.sound = sound       # sound or no sound?
     def echo(self, s, **kwargs):
-        click.echo(s, **kwargs)
+        output_to_screen(s, **kwargs)
+    def echo_red(self, s, **kwargs):
+        output_to_screen(stylize_string(s, fg='red'), **kwargs)
+    def echo_green(self, s, **kwargs):
+        output_to_screen(stylize_string(s, fg='green'), **kwargs)
+    def echo_yellow(self, s):
+        output_to_screen(stylize_string(s, fg='yellow'))
+    def echo_white(self, s):
+        output_to_screen(stylize_string(s, fg='white'))
+    def styled_echo(self, s, **kwargs):
+        output_to_screen(stylize_string(s, **kwargs))
+    def stylized_echo(self, s, echo={}, style={}):
+        output_to_screen(stylize_string(s, **style), **echo)
+    def new_line(self):
+        output_to_screen()
     def clear_screen(self):
         click.clear()
     def prompt(self, s, **kwargs):
-        return click.prompt(s, **kwargs)
+        return prompt_user(s, **kwargs)
     def styled_prompt(self, s, style={}, prompt={}):
-        return click.prompt(click.style(s, **style), **prompt)
+        return prompt_user(stylize_string(s, **style), **prompt)
     def pause(self, **kwargs):
-        click.pause(**kwargs)
+        wait_for_any_key(**kwargs)
     def is_solved(self):
         """
         In order to determine if the player has won
         We use some math, specifically a set operation
         Spaces do not count for the 'answer', so we have to remove them with the String.replace function
         """
-        return (set(self.answer.lower().replace(' ', '')) - set(self.chosen.lower())) == set()
+        answer = self.answer.lower().replace(' ', '')
+        chosen = self.chosen.lower()
+        answer_set = set(answer)
+        chosen_set = set(chosen)
+        return (answer_set - chosen_set) == set()
 
-@click.group()
-@click.option('-v', '--verbose', default=0, count=True, help="Help to debug your program, add more for more output")
-@click.option('-ns', '--nosound', default=True, is_flag=True, help="Toggle the sound, default is on")
-@click.pass_context
+@form_group()
+@add_option('-v', '--verbose', default=0, count=True, help="Help to debug your program, add more for more output")
+@add_option('-ns', '--nosound', default=True, is_flag=True, help="Toggle the sound, default is on")
+@pass_hangman
 def cli(hangman, verbose, nosound):
-    # Creates the object, only happens once every time it is run
+    """
+    This function is a 'magic' function
+    It gets called everytime the program starts
+    """
+    # Creates the hangman object, store it in the 'obj' of our game
     hangman.obj = HangmanObject(verbose=verbose, sound=nosound)
 
 @cli.command('pic')
-@click.argument('num_errors', type=int)
-@click.option('--color', default="yellow")
-@click.pass_obj
-def pic(obj, num_errors, color):
+@add_argument('num_errors', type=int)
+@add_option('--color', default="yellow")
+@pass_hangman
+def pic(hangman, num_errors, color):
     picture = pics[num_errors]
-    obj.styled_echo(picture, fg=color)
+    hangman.obj.styled_echo(picture, fg=color)
 
 @cli.command('say')
-@click.argument('what', nargs=-1)
-@click.pass_obj
-def say(obj, what):
+@add_argument('what', nargs=-1)
+@pass_hangman
+def say(hangman, what):
     """
     Makes the computer speak out-loud
     Works by calling the system's "say" command (Mac-only)
     If sound is turned off, does nothing
     """
-    if not obj.sound:
+    if not hangman.obj.sound:
         time.sleep(0.2)  # slight delay
         return
     cmds = ['say']
@@ -80,11 +113,11 @@ def say(obj, what):
     subprocess.run(cmds)
 
 @cli.command('blanks')
-@click.argument('answer')
-@click.argument('chosen')
-@click.option('--clue', default=None)
-@click.pass_obj
-def blanks(obj, answer, chosen, clue):
+@add_argument('answer')
+@add_argument('chosen')
+@add_option('--clue', default=None)
+@pass_hangman
+def blanks(hangman, answer, chosen, clue):
     """
     Outputs the answer with blanks, according to chosen
     Color: green for correct, red for incorrect
@@ -100,25 +133,25 @@ def blanks(obj, answer, chosen, clue):
     for word in answer.split(' '):
         width_count += (len(word) + 1) * 2
         if width_count > max_width:
-            obj.new_line()
+            hangman.obj.new_line()
             width_count = (len(word) + 1) * 2
         for l in range(len(word)):
             letter = word[l].lower()
             if letter in chosen:
-                obj.stylized_echo(letter.upper() + ' ', style={'fg':'white'}, echo={'nl': False})
+                hangman.obj.stylized_echo(letter.upper() + ' ', style={'fg':'white'}, echo={'nl': False})
             else:
-                obj.stylized_echo('_ ', style={'fg':'yellow'}, echo={'nl': False})
-        obj.echo('  ', nl=False)  # space between words
+                hangman.obj.stylized_echo('_ ', style={'fg':'yellow'}, echo={'nl': False})
+        hangman.obj.echo('  ', nl=False)  # space between words
 
-    obj.new_line()
+    hangman.obj.new_line()
 
     # output the clue, if provided
     if clue:
-        obj.new_line()
+        hangman.obj.new_line()
         clue = clue.title()
-        obj.stylized_echo('Clue: ', echo={'nl':False}, style={'fg':'yellow'})
-        obj.echo_white(clue)
-    obj.new_line()
+        hangman.obj.stylized_echo('Clue: ', echo={'nl':False}, style={'fg':'yellow'})
+        hangman.obj.echo_white(clue)
+    hangman.obj.new_line()
 
     # loop from a to z, counting by integer
     for c in range(ord('a'), ord('z')+1):
@@ -132,18 +165,18 @@ def blanks(obj, answer, chosen, clue):
         else:
             color = "white"
         # output the character, without a new line
-        obj.stylized_echo(ch, echo={'nl':False}, style={'fg':color})
-    obj.new_line()
+        hangman.obj.stylized_echo(ch, echo={'nl':False}, style={'fg':color})
+    hangman.obj.new_line()
 
 def valid_choice(value):
     return len(value) == 1
 
 @cli.command()
-@click.pass_obj
-def ask_user(obj):
+@pass_hangman
+def ask_user(hangman):
     choice = None
     while not choice:
-        choice = obj.styled_prompt("Pick any letter", style={'fg': "yellow"})
+        choice = hangman.obj.styled_prompt("Pick any letter", style={'fg': "yellow"})
         choice = choice.lower()
         if choice == 'debug':
             # special operation to go into the debugger
@@ -151,18 +184,13 @@ def ask_user(obj):
             choice = None
             continue
         if not valid_choice(choice):
-            obj.styled_echo("Has to be just one character!", fg="red")
+            hangman.obj.styled_echo("Has to be just one character!", fg="red")
             choice = None
     return choice
 
-@cli.command()
-@click.pass_context
-def run(hangman):
-    """
-    Executes the main program loop
-    """
-    hangman.obj.clear_screen()
-
+@cli.command('setup_game')
+@pass_hangman
+def setup_game(hangman):
     # Get the main program variables that we will use throughout the program
     default_name = "No Name"
     name = hangman.obj.styled_prompt(
@@ -197,8 +225,18 @@ def run(hangman):
     hangman.obj.num_errors = 0
     hangman.obj.chosen = ''
 
+@cli.command()
+@pass_hangman
+def run(hangman):
+    """
+    Executes the main program loop
+    """
+    hangman.obj.clear_screen()   # blanks the screen
+    hangman.invoke(setup_game)   # 
     over = False
+
     while not over:
+
         hangman.obj.clear_screen()
         hangman.invoke(
             pic, 
@@ -216,16 +254,14 @@ def run(hangman):
         if hangman.obj.is_solved():
             hangman.obj.echo_yellow('!!!!! YOU WON !!!!!')
             hangman.invoke(
-                say, what=hangman.obj.answer.split(' ')
+                say, what=hangman.obj.answer.split(' ')    # break up the answer into chunks of words with String.split()
             )
             hangman.obj.pause(info="")
             hangman.obj.clear_screen()
             over = True
             continue
 
-        choice = hangman.invoke(
-            ask_user
-        )
+        choice = hangman.invoke(ask_user)
 
         if choice in hangman.obj.chosen:
             hangman.invoke(
