@@ -108,6 +108,8 @@ def say(hangman, what):
     if not hangman.obj.sound:
         time.sleep(0.2)  # slight delay
         return
+    if type(what) == str:
+        what = what.split(" ")
     cmds = ['say']
     cmds.extend(what)
     subprocess.run(cmds)
@@ -178,14 +180,27 @@ def ask_user(hangman):
     while not choice:
         choice = hangman.obj.styled_prompt("Pick any letter", style={'fg': "yellow"})
         choice = choice.lower()
+
+        if not valid_choice(choice):
+            hangman.obj.styled_echo("Has to be just one character!", fg="red")
+            choice = None
+            continue
+
+        if ord(choice) not in range(ord('a'), ord('z')+1):
+            hangman.obj.styled_echo("Type a letter from A to Z!", fg="red")
+            hangman.invoke(
+                say,
+                what="That is an illegal character. Illegal!"
+            )
+            choice = None
+            continue
+
         if choice == 'debug':
             # special operation to go into the debugger
             from IPython import embed;embed()
             choice = None
             continue
-        if not valid_choice(choice):
-            hangman.obj.styled_echo("Has to be just one character!", fg="red")
-            choice = None
+
     return choice
 
 @cli.command('setup_game')
@@ -204,7 +219,7 @@ def setup_game(hangman):
     # Say hello to the player
     hangman.invoke(
         say, 
-        what=['Greetings, ', hangman.obj.player_name]
+        what='Greetings, ' + hangman.obj.player_name
     )
 
     # Get the answer
@@ -266,7 +281,7 @@ def run(hangman):
         if choice in hangman.obj.chosen:
             hangman.invoke(
                 say, 
-                what=["What", "are", "you", "doing, ", hangman.obj.player_name, "?"]
+                what="What are you doing, " + hangman.obj.player_name + "?"
             )
             continue
 
@@ -280,7 +295,7 @@ def run(hangman):
             hangman.obj.echo_red('No')
             hangman.invoke(
                 say, 
-                what=['No!']
+                what='No!'
             )
             hangman.obj.num_errors += 1
 
@@ -293,7 +308,7 @@ def run(hangman):
             if hangman.obj.num_errors == 6:
                 hangman.obj.echo_red("HA!")
                 hangman.invoke(
-                    say, what=["Ha, ", "you", "lose"]
+                    say, what="Ha, you lose"
                 )
                 hangman.obj.clear_screen()
                 hangman.invoke(
@@ -320,7 +335,7 @@ def run(hangman):
         else:
             hangman.obj.echo_green("Yes!")
             hangman.invoke(
-                say, what=["Yes!"]
+                say, what="Yes!"
             )
 
 
