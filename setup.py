@@ -1,6 +1,6 @@
 from distutils.core import setup
 setup(
-    name = "Speaking Hangman!",
+    name = "Speaking Hangman",
     version = "0.5",
     description = "Do hangman, the cmdline way",
     author = "Adam Morris",
