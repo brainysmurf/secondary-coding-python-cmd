@@ -108,8 +108,8 @@ def say(hangman, what):
     if not hangman.obj.sound:
         time.sleep(0.2)  # slight delay
         return
-    if type(what) == str:
-        what = what.split(" ")
+    if isinstance(what, str):
+        what = what.split(" ")  # convert the words into a list
     cmds = ['say']
     cmds.extend(what)
     subprocess.run(cmds)
@@ -204,8 +204,9 @@ def ask_user(hangman):
     return choice
 
 @cli.command('setup_game')
+@click.option('--hide_answer/--show_answer', default=True, help="Uses test information")
 @pass_hangman
-def setup_game(hangman):
+def setup_game(hangman, hide_answer):
     # Get the main program variables that we will use throughout the program
     default_name = "No Name"
     name = hangman.obj.styled_prompt(
@@ -225,7 +226,7 @@ def setup_game(hangman):
     # Get the answer
     hangman.obj.new_line()
     hangman.obj.echo_yellow("Enter the answer (input is hidden so others won't see!)")
-    answer = hangman.obj.prompt(' ', hide_input=True)
+    answer = hangman.obj.prompt(' ', hide_input=hide_answer)
     hangman.obj.answer = answer
 
     # Set up the clue
@@ -241,13 +242,14 @@ def setup_game(hangman):
     hangman.obj.chosen = ''
 
 @cli.command()
+@click.option('--shh_answer/--echo_answer', is_flag=True, default=True, help="Echo to screen or not")
 @pass_hangman
-def run(hangman):
+def run(hangman, shh_answer):
     """
     Executes the main program loop
     """
     hangman.obj.clear_screen()   # blanks the screen
-    hangman.invoke(setup_game)   # 
+    hangman.invoke(setup_game, hide_answer=shh_answer)   # 
     over = False
 
     while not over:
