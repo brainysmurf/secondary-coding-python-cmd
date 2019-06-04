@@ -7,24 +7,26 @@ import subprocess               # subprocess: Gives us the 'say' command
 import time                     # time: let's us delay the action briefly
 
 import click                    # click: provides tools that makes input and output much easier for the programmer
+import hangman.hooks as hangman_hooks
+
 """
 Click is a framework provided by an open source group
 http://click.pocoo.org/
-We use it to interact with the user and 
+We use it to interact with the user and
     to ouput stuff to the screen
 The next 10 lines defines more descriptive variables for
     the click functions that we use
 """
-output_to_screen  = click.echo
-stylize_string    = click.style
-prompt_user       = click.prompt
-wait_for_any_key  = click.pause
-pass_hangman      = click.pass_context
-form_group        = click.group
-make_command      = click.command
-add_argument      = click.argument
-add_option        = click.option
-add_argument      = click.argument
+output_to_screen = click.echo
+stylize_string = click.style
+prompt_user = click.prompt
+wait_for_any_key = click.pause
+pass_hangman = click.pass_context
+form_group = click.group
+make_command = click.command
+add_argument = click.argument
+add_option = click.option
+add_argument = click.argument
 
 
 class HangmanObject(object):
@@ -34,36 +36,54 @@ class HangmanObject(object):
        * output to screen
        * gets input from ask_user
     """
-    def __init__(self, verbose, sound):
+
+    def __init__(self, verbose, sound, player, answer, clue, **kwargs):
         """
         Called at object creation
         """
         self.verbose = verbose   # note: verbose is not currently used for anything
         self.sound = sound       # sound or no sound?
+        self.player_name = player
+        self.answer = answer
+        self.clue = clue
+        super().__init__(**kwargs)
+
     def echo(self, s, **kwargs):
         output_to_screen(s, **kwargs)
+
     def echo_red(self, s, **kwargs):
         output_to_screen(stylize_string(s, fg='red'), **kwargs)
+
     def echo_green(self, s, **kwargs):
         output_to_screen(stylize_string(s, fg='green'), **kwargs)
+
     def echo_yellow(self, s):
         output_to_screen(stylize_string(s, fg='yellow'))
+
     def echo_white(self, s):
         output_to_screen(stylize_string(s, fg='white'))
+
     def styled_echo(self, s, **kwargs):
         output_to_screen(stylize_string(s, **kwargs))
+
     def stylized_echo(self, s, echo={}, style={}):
         output_to_screen(stylize_string(s, **style), **echo)
+
     def new_line(self):
         output_to_screen()
+
     def clear_screen(self):
         click.clear()
+
     def prompt(self, s, **kwargs):
         return prompt_user(s, **kwargs)
+
     def styled_prompt(self, s, style={}, prompt={}):
         return prompt_user(stylize_string(s, **style), **prompt)
+
     def pause(self, **kwargs):
         wait_for_any_key(**kwargs)
+
     def is_solved(self):
         """
         In order to determine if the player has won
@@ -76,17 +96,42 @@ class HangmanObject(object):
         chosen_set = set(chosen)
         return (answer_set - chosen_set) == set()
 
+
 @form_group()
 @add_option('-v', '--verbose', default=0, count=True, help="Help to debug your program, add more for more output")
 @add_option('-ns', '--nosound', default=True, is_flag=True, help="Toggle the sound, default is on")
+@add_option('-h', '--hook', multiple=True)
+@add_option('-s', '--setup', nargs=3)
 @pass_hangman
-def cli(hangman, verbose, nosound):
+def cli(hangman, verbose, nosound, hook, setup):
     """
     This function is a 'magic' function
     It gets called everytime the program starts
     """
     # Creates the hangman object, store it in the 'obj' of our game
-    hangman.obj = HangmanObject(verbose=verbose, sound=nosound)
+    if setup:
+        player, answer, clue = setup
+    else:
+        player, answer, clue = (None, None, None)
+
+    if not hook:
+        hangman.obj = HangmanObject(verbose=verbose, sound=nosound, player=player, answer=answer, clue=clue)
+    else:
+        #from hangman.hooks import SolveHook
+        #hangman.obj = type('HangmanObjWHooks', (SolveHook, HangmanObject), {})(verbose=verbose, sound=nosound, hooks=hook, player=player, answer=answer, clue=clue)
+        # Import all the classes the end with the name "Hook" so we can use mixins
+
+        classes = [getattr(hangman_hooks, m) for m in dir(hangman_hooks) if m.endswith('Hook')]
+        classes.append(HangmanObject)
+        hangman_class = type('HangmanHookedObject', tuple(classes), {})
+        hangman.obj = hangman_class(verbose=verbose, sound=nosound, hooks=hook, player=player, answer=answer, clue=clue)
+
+
+@cli.command('title')
+def title_screen():
+    from hangman.lang import title_screen
+    print(title_screen)
+
 
 @cli.command('pic')
 @add_argument('num_errors', type=int)
@@ -95,6 +140,7 @@ def cli(hangman, verbose, nosound):
 def pic(hangman, num_errors, color):
     picture = pics[num_errors]
     hangman.obj.styled_echo(picture, fg=color)
+
 
 @cli.command('say')
 @add_argument('what', nargs=-1)
@@ -113,6 +159,7 @@ def say(hangman, what):
     cmds = ['say']
     cmds.extend(what)
     subprocess.run(cmds)
+
 
 @cli.command('blanks')
 @add_argument('answer')
@@ -140,9 +187,9 @@ def blanks(hangman, answer, chosen, clue):
         for l in range(len(word)):
             letter = word[l].lower()
             if letter in chosen:
-                hangman.obj.stylized_echo(letter.upper() + ' ', style={'fg':'white'}, echo={'nl': False})
+                hangman.obj.stylized_echo(letter.upper() + ' ', style={'fg': 'white'}, echo={'nl': False})
             else:
-                hangman.obj.stylized_echo('_ ', style={'fg':'yellow'}, echo={'nl': False})
+                hangman.obj.stylized_echo('_ ', style={'fg': 'yellow'}, echo={'nl': False})
         hangman.obj.echo('  ', nl=False)  # space between words
 
     hangman.obj.new_line()
@@ -151,12 +198,12 @@ def blanks(hangman, answer, chosen, clue):
     if clue:
         hangman.obj.new_line()
         clue = clue.title()
-        hangman.obj.stylized_echo('Clue: ', echo={'nl':False}, style={'fg':'yellow'})
+        hangman.obj.stylized_echo('Clue: ', echo={'nl': False}, style={'fg': 'yellow'})
         hangman.obj.echo_white(clue)
     hangman.obj.new_line()
 
     # loop from a to z, counting by integer
-    for c in range(ord('a'), ord('z')+1):
+    for c in range(ord('a'), ord('z') + 1):
         # convert integer into the cooresponding character
         ch = chr(c)
         if ch in chosen:
@@ -167,11 +214,13 @@ def blanks(hangman, answer, chosen, clue):
         else:
             color = "white"
         # output the character, without a new line
-        hangman.obj.stylized_echo(ch, echo={'nl':False}, style={'fg':color})
+        hangman.obj.stylized_echo(ch, echo={'nl': False}, style={'fg': color})
     hangman.obj.new_line()
+
 
 def valid_choice(value):
     return len(value) == 1
+
 
 @cli.command()
 @pass_hangman
@@ -186,7 +235,7 @@ def ask_user(hangman):
             choice = None
             continue
 
-        if ord(choice) not in range(ord('a'), ord('z')+1):
+        if ord(choice) not in range(ord('a'), ord('z') + 1):
             hangman.obj.styled_echo("Type a letter from A to Z!", fg="red")
             hangman.invoke(
                 say,
@@ -197,49 +246,58 @@ def ask_user(hangman):
 
         if choice == 'debug':
             # special operation to go into the debugger
-            from IPython import embed;embed()
+            from IPython import embed
+            embed()
             choice = None
             continue
 
     return choice
 
+
 @cli.command('setup_game')
 @click.option('--hide_answer/--show_answer', default=True, help="Uses test information")
 @pass_hangman
 def setup_game(hangman, hide_answer):
-    # Get the main program variables that we will use throughout the program
-    default_name = "No Name"
-    name = hangman.obj.styled_prompt(
-        "Enter your name", 
-        style={'fg':'yellow'}, 
-        prompt={'default':default_name, 'show_default':False}
-    )
-    hangman.obj.player_name = name
-    hangman.obj.player_name = hangman.obj.player_name.title()
+    if hangman.obj.player_name is None:
+        # Get the main program variables that we will use throughout the program
+        default_name = "No Name"
+        name = hangman.obj.styled_prompt(
+            "Enter your name",
+            style={'fg': 'yellow'},
+            prompt={'default': default_name, 'show_default': False}
+        )
+        hangman.obj.player_name = name
+        hangman.obj.player_name = hangman.obj.player_name.title()
 
     # Say hello to the player
-    hangman.invoke(
-        say, 
-        what='Greetings, ' + hangman.obj.player_name
-    )
+    if hangman.obj.sound:
+        hangman.invoke(
+            say,
+            what='Greetings, ' + hangman.obj.player_name
+        )
 
     # Get the answer
-    hangman.obj.new_line()
-    hangman.obj.echo_yellow("Enter the answer (input is hidden so others won't see!)")
-    answer = hangman.obj.prompt(' ', hide_input=hide_answer)
-    hangman.obj.answer = answer
+    if hangman.obj.answer is None:
+        hangman.obj.new_line()
+        if hide_answer:
+            hangman.obj.echo_yellow("Enter the answer (input is hidden so others won't see!)")
+        else:
+            hangman.obj.echo_yellow("Enter the answer (careful, others will see it!)")
+        hangman.obj.answer = hangman.obj.prompt(' ', hide_input=hide_answer)
 
     # Set up the clue
-    hangman.obj.new_line()
-    clue = hangman.obj.prompt('Clue?', default='', show_default=False)
-    if clue:
-        hangman.obj.clue = clue
-    else:
-        hangman.obj.clue = None
+    if hangman.obj.clue is None:
+        hangman.obj.new_line()
+        clue = hangman.obj.prompt('Clue?', default='', show_default=False)
+        if clue:
+            hangman.obj.clue = clue
+        else:
+            hangman.obj.clue = None
 
     # Set up the counters
     hangman.obj.num_errors = 0
     hangman.obj.chosen = ''
+
 
 @cli.command()
 @click.option('--shh_answer/--echo_answer', is_flag=True, default=True, help="Echo to screen or not")
@@ -248,21 +306,22 @@ def run(hangman, shh_answer):
     """
     Executes the main program loop
     """
+
     hangman.obj.clear_screen()   # blanks the screen
-    hangman.invoke(setup_game, hide_answer=shh_answer)   # 
+    hangman.invoke(setup_game, hide_answer=shh_answer)   #
     over = False
 
     while not over:
 
         hangman.obj.clear_screen()
         hangman.invoke(
-            pic, 
+            pic,
             num_errors=hangman.obj.num_errors
         )
         hangman.obj.new_line()
         hangman.invoke(
-            blanks, 
-            answer=hangman.obj.answer, 
+            blanks,
+            answer=hangman.obj.answer,
             chosen=hangman.obj.chosen,
             clue=hangman.obj.clue
         )
@@ -282,13 +341,13 @@ def run(hangman, shh_answer):
 
         if choice in hangman.obj.chosen:
             hangman.invoke(
-                say, 
+                say,
                 what="What are you doing, " + hangman.obj.player_name + "?"
             )
             continue
 
         hangman.invoke(
-            say, 
+            say,
             what=[choice]
         )
         hangman.obj.chosen += choice
@@ -296,7 +355,7 @@ def run(hangman, shh_answer):
         if choice.lower() not in hangman.obj.answer.lower():
             hangman.obj.echo_red('No')
             hangman.invoke(
-                say, 
+                say,
                 what='No!'
             )
             hangman.obj.num_errors += 1
@@ -314,23 +373,23 @@ def run(hangman, shh_answer):
                 )
                 hangman.obj.clear_screen()
                 hangman.invoke(
-                    pic, 
+                    pic,
                     num_errors=hangman.obj.num_errors, color="red"
                 )
                 hangman.obj.new_line()
                 hangman.obj.echo("Correct:")
                 hangman.obj.new_line()
                 hangman.invoke(
-                    blanks, 
+                    blanks,
                     answer=hangman.obj.answer, chosen=hangman.obj.answer
                 )
                 hangman.obj.new_line()
                 hangman.obj.new_line()
                 hangman.obj.echo("Your plays:")
                 hangman.invoke(
-                    blanks, 
+                    blanks,
                     answer=hangman.obj.answer, chosen=hangman.obj.chosen
-                )                
+                )
                 hangman.obj.pause(info="")
                 hangman.obj.clear_screen()
                 over = True
@@ -339,8 +398,3 @@ def run(hangman, shh_answer):
             hangman.invoke(
                 say, what="Yes!"
             )
-
-
-
-
-
